@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Doctor Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="header">
+        <h2>CareVoice</h2>
+        <span class="status" id="status">● Ready</span>
+    </header>
+
+    <main class="dashboard">
+
+        <section class="welcome">
+            <h1>Doctor Appointment Assistant</h1>
+            <p>Talk to our AI assistant to book or cancel your appointment.</p>
+        </section>
+
+        <section class="call-card">
+            <div class="mic-icon">🎙️</div>
+            <h2>Voice Assistant</h2>
+            <p id="call-message">Click below to start your conversation.</p>
+
+            <div class="buttons">
+                <button id="startCall">Start Call</button>
+                <button id="endCall" disabled>End Call</button>
+            </div>
+        </section>
+
+        <section class="content-grid">
+
+            <div class="card">
+                <h2>Live Conversation</h2>
+                <div id="transcript" class="transcript">
+                    <p class="empty">Your conversation will appear here.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Available Doctors</h2>
+
+                <div class="doctor">
+                    <h3>Dr. Ananya</h3>
+                    <p>Cardiologist</p>
+                    <span>10 AM · 11 AM</span>
+                </div>
+
+                <div class="doctor">
+                    <h3>Dr. Rahul</h3>
+                    <p>Dermatologist</p>
+                    <span>12 PM · 2 PM</span>
+                </div>
+
+                <div class="doctor">
+                    <h3>Dr. Priya</h3>
+                    <p>General Physician</p>
+                    <span>3 PM · 4 PM</span>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="card appointment-card">
+            <h2>Appointment Updates</h2>
+            <div id="appointments">
+                <p class="empty">Your appointment updates will appear here.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script type="module" src="/script.js"></script>
+</body>
+</html>

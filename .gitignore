@@ -1,0 +1,25 @@
+# Secrets
+.env
+**/.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+
+# Audio
+*.mp3
+*.wav
+
+# Logs
+*.log

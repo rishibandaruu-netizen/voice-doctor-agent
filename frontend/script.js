@@ -2,6 +2,10 @@
 import { PipecatClient } from "@pipecat-ai/client-js";
 import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
 
+// Backend URLs
+const BOT_URL = import.meta.env.VITE_BOT_URL || "http://localhost:7860";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 const status = document.getElementById("status");
 const message = document.getElementById("call-message");
 const transcript = document.getElementById("transcript");
@@ -64,6 +68,7 @@ client = new PipecatClient({
     },
 });
 
+// Start voice call
 startButton.addEventListener("click", async () => {
     try {
         status.textContent = "● Connecting...";
@@ -73,7 +78,7 @@ startButton.addEventListener("click", async () => {
         await client.initDevices();
 
         await client.startBotAndConnect({
-            endpoint: "http://localhost:7860/start",
+            endpoint: `${BOT_URL}/start`,
             requestData: {
                 transport: "webrtc",
                 enableDefaultIceServers: true,
@@ -88,16 +93,18 @@ startButton.addEventListener("click", async () => {
     }
 });
 
+// End voice call
 endButton.addEventListener("click", async () => {
     await client.disconnect();
 });
 
+// Load appointments
 async function loadAppointments() {
     const container = document.getElementById("appointments");
 
     try {
         const response = await fetch(
-            "http://localhost:8000/api/appointments"
+            `${API_URL}/api/appointments`
         );
 
         if (!response.ok) {

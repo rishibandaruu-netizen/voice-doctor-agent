@@ -1,16 +1,15 @@
 
 import os
-import sqlite3
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from psycopg.rows import dict_row
+
+from backend.database import get_connection
 
 app = FastAPI(title="CareVoice Dashboard API")
 
-frontend_url = os.getenv(
-    "FRONTEND_URL",
-    "http://localhost:5173"
-)
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,35 +29,45 @@ def home():
 
 @app.get("/api/appointments")
 def get_appointments():
-    conn = sqlite3.connect("appointments.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
+    conn.row_factory = dict_row
 
-    rows = conn.execute("""
-        SELECT
-            a.id,
-            a.patient_name,
-            d.name AS doctor_name,
-            d.specialty,
-            s.slot_time,
-            a.status
-        FROM appointments a
-        LEFT JOIN doctors d ON a.doctor_id = d.id
-        LEFT JOIN slots s ON a.slot_id = s.id
-        ORDER BY a.id DESC
-    """).fetchall()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    a.id,
+                    a.patient_name,
+                    d.name AS doctor_name,
+                    d.specialty,
+                    s.slot_time,
+                    a.status
+                FROM appointments a
+                LEFT JOIN doctors d ON a.doctor_id = d.id
+                LEFT JOIN slots s ON a.slot_id = s.id
+                ORDER BY a.id DESC
+            """)
 
-    conn.close()
-    return [dict(row) for row in rows]
+            return cursor.fetchall()
+
+    finally:
+        conn.close()
 
 
 @app.get("/api/doctors")
 def get_doctors():
-    conn = sqlite3.connect("appointments.db")
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
+    conn.row_factory = dict_row
 
-    rows = conn.execute("""
-        SELECT id, name, specialty FROM doctors
-    """).fetchall()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, name, specialty
+                FROM doctors
+                ORDER BY id
+            """)
 
-    conn.close()
-    return [dict(row) for row in rows]
+            return cursor.fetchall()
+
+    finally:
+        conn.close()

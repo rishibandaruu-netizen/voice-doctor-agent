@@ -3,99 +3,85 @@ from backend.database import get_connection
 
 
 def check_doctor_availability(specialty=None):
-
     conn = get_connection()
-    cursor = conn.cursor()
 
-    query = """
-        SELECT
-            doctors.id,
-            doctors.name,
-            doctors.specialty,
-            slots.id,
-            slots.slot_time
-        FROM doctors
-        JOIN slots
-        ON doctors.id = slots.doctor_id
-        WHERE slots.is_available = 1
-    """
+    try:
+        with conn.cursor() as cursor:
+            query = """
+                SELECT
+                    doctors.id,
+                    doctors.name,
+                    doctors.specialty,
+                    slots.id,
+                    slots.slot_time
+                FROM doctors
+                JOIN slots ON doctors.id = slots.doctor_id
+                WHERE slots.is_available = TRUE
+            """
 
-    params = []
+            params = []
 
-    if specialty:
-        query += " AND LOWER(doctors.specialty) = LOWER(?)"
-        params.append(specialty)
+            if specialty:
+                query += " AND LOWER(doctors.specialty) = LOWER(%s)"
+                params.append(specialty)
 
-    cursor.execute(query, params)
+            cursor.execute(query, params)
+            results = cursor.fetchall()
 
-    results = cursor.fetchall()
+        return [
+            {
+                "doctor_id": row[0],
+                "doctor_name": row[1],
+                "specialty": row[2],
+                "slot_id": row[3],
+                "slot_time": row[4]
+            }
+            for row in results
+        ]
 
-    conn.close()
-
-    available_slots = []
-
-    for row in results:
-        available_slots.append({
-            "doctor_id": row[0],
-            "doctor_name": row[1],
-            "specialty": row[2],
-            "slot_id": row[3],
-            "slot_time": row[4]
-        })
-
-    return available_slots
-
+    finally:
+        conn.close()
 
 
 def book_appointment(slot_id, phone, patient_name=None):
-
     conn = get_connection()
-    cursor = conn.cursor()
 
     try:
-        # Start a database transaction
-        cursor.execute("BEGIN IMMEDIATE")
+        with conn.cursor() as cursor:
 
-        # Check whether the selected slot is available
-        cursor.execute(
-            "SELECT doctor_id, slot_time FROM slots "
-            "WHERE id = ? AND is_available = 1",
-            (slot_id,)
-        )
+            # Lock the slot to prevent double booking
+            cursor.execute("""
+                SELECT doctor_id, slot_time
+                FROM slots
+                WHERE id = %s AND is_available = TRUE
+                FOR UPDATE
+            """, (slot_id,))
 
-        slot = cursor.fetchone()
+            slot = cursor.fetchone()
 
-        if slot is None:
-            conn.rollback()
-            return {
-                "success": False,
-                "message": "Sorry, this slot is not available."
-            }
+            if slot is None:
+                conn.rollback()
+                return {
+                    "success": False,
+                    "message": "Sorry, this slot is not available."
+                }
 
-        doctor_id, slot_time = slot
+            doctor_id, slot_time = slot
 
-        # Save the appointment
-        cursor.execute("""
-            INSERT INTO appointments
-            (patient_name, phone, doctor_id, slot_id, status)
-            VALUES (?, ?, ?, ?, 'booked')
-        """, (patient_name, phone, doctor_id, slot_id))
+            cursor.execute("""
+                INSERT INTO appointments
+                (patient_name, phone, doctor_id, slot_id, status)
+                VALUES (%s, %s, %s, %s, 'booked')
+                RETURNING id
+            """, (patient_name, phone, doctor_id, slot_id))
 
-        appointment_id = cursor.lastrowid
+            appointment_id = cursor.fetchone()[0]
 
-        # Mark the slot as unavailable
-        cursor.execute("""
-            UPDATE slots
-            SET is_available = 0
-            WHERE id = ? AND is_available = 1
-        """, (slot_id,))
-
-        if cursor.rowcount != 1:
-            conn.rollback()
-            return {
-                "success": False,
-                "message": "This slot is no longer available."
-            }
+            cursor.execute("""
+                UPDATE slots
+                SET is_available = FALSE
+                WHERE id = %s
+            """, (slot_id,))
 
         conn.commit()
 
@@ -119,50 +105,45 @@ def book_appointment(slot_id, phone, patient_name=None):
         conn.close()
 
 
-
 def cancel_appointment(appointment_id, phone):
-
     conn = get_connection()
-    cursor = conn.cursor()
 
     try:
-        cursor.execute("BEGIN IMMEDIATE")
+        with conn.cursor() as cursor:
 
-        # Find the patient's booked appointment
-        cursor.execute("""
-            SELECT slot_id
-            FROM appointments
-            WHERE id = ?
-            AND phone = ?
-            AND status = 'booked'
-        """, (appointment_id, phone))
+            cursor.execute("""
+                SELECT slot_id
+                FROM appointments
+                WHERE id = %s
+                AND phone = %s
+                AND status = 'booked'
+                FOR UPDATE
+            """, (appointment_id, phone))
 
-        appointment = cursor.fetchone()
+            appointment = cursor.fetchone()
 
-        if appointment is None:
-            conn.rollback()
-            return {
-                "success": False,
-                "message": "No matching active appointment found."
-            }
+            if appointment is None:
+                conn.rollback()
+                return {
+                    "success": False,
+                    "message": "No matching active appointment found."
+                }
 
-        slot_id = appointment[0]
+            slot_id = appointment[0]
 
-        # Change appointment status to cancelled
-        cursor.execute("""
-            UPDATE appointments
-            SET status = 'cancelled'
-            WHERE id = ?
-            AND phone = ?
-            AND status = 'booked'
-        """, (appointment_id, phone))
+            cursor.execute("""
+                UPDATE appointments
+                SET status = 'cancelled'
+                WHERE id = %s
+                AND phone = %s
+                AND status = 'booked'
+            """, (appointment_id, phone))
 
-        # Make the appointment slot available again
-        cursor.execute("""
-            UPDATE slots
-            SET is_available = 1
-            WHERE id = ?
-        """, (slot_id,))
+            cursor.execute("""
+                UPDATE slots
+                SET is_available = TRUE
+                WHERE id = %s
+            """, (slot_id,))
 
         conn.commit()
 
@@ -181,8 +162,6 @@ def cancel_appointment(appointment_id, phone):
 
     finally:
         conn.close()
-
-
 
 
 if __name__ == "__main__":
@@ -204,27 +183,13 @@ if __name__ == "__main__":
 
     print(booking)
 
-    print("\n3. CHECKING AVAILABILITY AGAIN")
-
-    slots = check_doctor_availability("Cardiologist")
-
-    for slot in slots:
-        print(slot)
-
-    print("\n4. CANCELLING APPOINTMENT")
-
     if booking["success"]:
+
+        print("\n3. CANCELLING APPOINTMENT")
+
         cancellation = cancel_appointment(
             appointment_id=booking["appointment_id"],
             phone="9876543210"
         )
 
         print(cancellation)
-
-    print("\n5. FINAL AVAILABILITY")
-
-    slots = check_doctor_availability("Cardiologist")
-
-    for slot in slots:
-        print(slot)
-

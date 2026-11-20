@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-  "dev": "vite --host 0.0.0.0 frontend"
-},
+    "dev": "vite --host 0.0.0.0 frontend",
+    "build": "vite build frontend --outDir ../dist"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
